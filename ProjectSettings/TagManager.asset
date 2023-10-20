@@ -6,6 +6,12 @@ TagManager:
   tags:
   - Bullet
   - Gate
+  - Enemy
+  - EnemyBase
+  - DirectionCollision
+  - SpecialBullet
+  - EnemyBullet
+  - BulletBackCollision
   layers:
   - Default
   - TransparentFX
@@ -15,11 +21,11 @@ TagManager:
   - UI
   - Player
   - Bullet
-  - 
-  - 
-  - 
-  - 
-  - 
+  - SpecialBullet
+  - EnemyBase
+  - Explosion
+  - Plane
+  - Gate
   - 
   - 
   - 
