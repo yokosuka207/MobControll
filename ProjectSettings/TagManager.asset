@@ -12,6 +12,10 @@ TagManager:
   - SpecialBullet
   - EnemyBullet
   - BulletBackCollision
+  - NextStage
+  - Line
+  - cameraCollision]
+  - LastStage
   layers:
   - Default
   - TransparentFX
@@ -26,7 +30,7 @@ TagManager:
   - Explosion
   - Plane
   - Gate
-  - 
+  - EnemyBullet
   - 
   - 
   - 

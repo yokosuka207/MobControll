@@ -7,11 +7,15 @@ public class playerBullet : MonoBehaviour
     [SerializeField] private Transform[] enemyBase;
     [SerializeField] private float moveSpeed;
     [SerializeField] private float waitTime = 2.0f;
+    public playerBullet scPlayer;
+    private List<string> objectsToAvoid = new List<string>();
+    private string objectName;
     private enemyHealth collidableObject;
     private Transform currentTarget;
     private Vector3 originalVelocity;
     private Vector3 spawnPosition;
     private Vector3 bulletColPosition;
+    private Vector3 bulletDirection;
     private bool isDirection = false;
     private bool isEnabled = true;
     private int twice;
@@ -24,12 +28,12 @@ public class playerBullet : MonoBehaviour
 
     private void Start()
     {
-        DisableFunctionTemporarily(0.5f);
+        //DisableFunctionTemporarily(0.3f);
 
         renderer = GetComponent<Renderer>();
         initialColor = renderer.material.color;
 
-        transform.position += new Vector3(0.0f, 0, -0.3f);
+        bulletDirection = transform.forward;
 
         StartCoroutine(GetVelosity());
 
@@ -54,13 +58,11 @@ public class playerBullet : MonoBehaviour
                 transform.rotation = Quaternion.Slerp(transform.rotation, rotation, 5.0f * Time.deltaTime);
 
                 // 前進
-                transform.Translate(Vector3.forward * moveSpeed * Time.deltaTime);
+                transform.position += transform.forward * moveSpeed * Time.deltaTime;
             }
             else
             {
-                // ターゲットが存在しない場合、Z軸に向いて進む
-                transform.rotation = Quaternion.Euler(0, 0, 0); // Z軸に向く
-                transform.Translate(Vector3.forward * moveSpeed * Time.deltaTime); // 前進
+                transform.position += bulletDirection * moveSpeed * Time.deltaTime; // 前進
             }
         }
         else if(!isMove)
@@ -75,14 +77,33 @@ public class playerBullet : MonoBehaviour
         {
             textDisplay _textDisplay = other.GetComponent<textDisplay>();
             twice = _textDisplay.GetTwice();
-            createTwice();
+           
+            objectName = other.gameObject.name;
+
+            if (!objectsToAvoid.Contains(objectName))
+            {
+                createTwice();
+                objectsToAvoid.Add(objectName);
+            }
         }
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        //string collidingObjectName = other.gameObject.name;
+
+        //if (objectsToAvoid.Contains(collidingObjectName))
+        //{
+        //    createTwice();
+        //}
     }
 
     private void OnTriggerStay(Collider other)
     {
         if (other.CompareTag("DirectionCollision"))
+        {
             FindClosestTarget();
+        }
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -90,30 +111,63 @@ public class playerBullet : MonoBehaviour
         if(collision.gameObject.CompareTag("EnemyBase"))
             colorChange();
         if (collision.gameObject.CompareTag("EnemyBullet"))
-            colorChange();
-        if (collision.gameObject.CompareTag("BulletBackCollision"))
         {
-            bulletColPosition = transform.position;
-            Debug.Log("あた");
+            Debug.Log("こりじょん");
+            colorChange();
         }
+        if (collision.gameObject.CompareTag("BulletBackCollision"))
+            bulletColPosition = transform.position;
     }
 
     private void OnCollisionStay(Collision collision)
     {
         if (collision.gameObject.CompareTag("BulletBackCollision"))
-        {
             transform.position = bulletColPosition;
-            Debug.Log("あた");
-        }
     }
 
     private void HandleObjectDestroyed()
     {
         if (gameObject != null)
         {
-            isDirection = false;
-            Invoke("bulletAllDestory", 2.0f);
+            if (collidableObject != null)
+            {
+                collidableObject.OnDestroy -= HandleObjectDestroyed;
+            }
+
+            StartCoroutine(WaitForFrames());
         }
+    }
+    private enemyHealth FindNewCollidableObject()
+    {
+        GameObject[] objectsWithTag = GameObject.FindGameObjectsWithTag("EnemyBase");
+        foreach (var obj in objectsWithTag)
+        {
+            enemyHealth healthComponent = obj.GetComponent<enemyHealth>();
+            if (healthComponent != null && obj.activeSelf)
+            {
+                return healthComponent;
+            }
+        }
+
+        return null;
+    }
+
+    private IEnumerator WaitForFrames()
+    {
+        yield return null;
+
+
+            collidableObject = FindNewCollidableObject();
+            if (collidableObject != null)
+            {
+                collidableObject.OnDestroy += HandleObjectDestroyed;
+            }
+            else
+            {
+                isDirection = false;
+                Invoke("bulletAllDestory", 1.0f);
+            }
+        
     }
 
     private void colorChange()
@@ -129,15 +183,19 @@ public class playerBullet : MonoBehaviour
             fadedColor.g = 1.0f;
             renderer.material.color = fadedColor;
 
+            Debug.Log("kannsuu");
+
             StartCoroutine(ResetColorAfterDelay());
         }
     }
 
     private IEnumerator ResetColorAfterDelay()
     {
-        yield return new WaitForSeconds(0.4f); // 0.5秒待つ
+        yield return new WaitForSeconds(0.2f); // 0.5秒待つ
         renderer.material.color = initialColor; // 元の色に戻す
         Destroy(gameObject, 0.1f);
+
+        Debug.Log("あたた");
     }
     private IEnumerator GetVelosity()
     {
@@ -145,7 +203,7 @@ public class playerBullet : MonoBehaviour
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null)
         {
-            originalVelocity = rb.velocity;
+            //originalVelocity = rb.velocity;
         }
     }
 
@@ -206,11 +264,22 @@ public class playerBullet : MonoBehaviour
             {
                 int j = i % 2;
                 if (j == 0)
-                    spawnPosition = new Vector3(i * 0.5f, 0, 0);
+                    spawnPosition = transform.right * i * 0.1f;
                 else
-                    spawnPosition = new Vector3(i * -0.5f, 0, 0);
+                    spawnPosition = transform.right * i * -0.1f;
 
-                Instantiate(gameObject, gameObject.transform.position + spawnPosition, Quaternion.identity);
+                if(gameObject.CompareTag("SpecialBullet"))
+                {
+                    if (j == 0)
+                        spawnPosition = transform.right * i * 0.2f;
+                    else
+                        spawnPosition = transform.right * i * -0.2f;
+                }
+
+                playerBullet p = null;
+                p = Instantiate(scPlayer, gameObject.transform.position + spawnPosition, Quaternion.identity);
+                p.gameObject.transform.forward = bulletDirection;
+                p.objectsToAvoid.Add(objectName);
             }
         }
     }

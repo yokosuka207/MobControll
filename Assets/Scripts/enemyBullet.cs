@@ -5,9 +5,15 @@ using UnityEngine;
 public class enemyBullet : MonoBehaviour
 {
     [SerializeField] private float moveSpeed;
+    private List<string> objectsToAvoid = new List<string>();
+    public enemyBullet scEnemy;
+    private string objectName;
     private enemyHealth collidableObject;
+    private playerMove scPlayer;
     private Vector3 originalVelocity;
+    private Vector3 bulletDirection;
     private bool isEnabled = true;
+    private bool isLoose = false;
     private int twice;
 
     private Vector3 initialPosition;
@@ -17,29 +23,34 @@ public class enemyBullet : MonoBehaviour
 
     private void Start()
     {
-        DisableFunctionTemporarily(0.5f);
+        //DisableFunctionTemporarily(0.5f);
 
         renderer = GetComponent<Renderer>();
         initialColor = renderer.material.color;
 
-        Rigidbody rb = GetComponent<Rigidbody>();
-        if (rb != null)
-        {
-            originalVelocity = rb.velocity;
-        }
+        GameObject obj = GameObject.Find("Player");
+        scPlayer = obj.GetComponent<playerMove>();
 
         // BaseDestroyéÊìæ
         collidableObject = FindObjectOfType<enemyHealth>();
         if (collidableObject != null)
         {
             collidableObject.OnDestroy += HandleObjectDestroyed;
+
+            bulletDirection = -collidableObject.transform.forward;
+
+            Rigidbody rb = collidableObject.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                originalVelocity = rb.velocity;
+            }
         }
     }
 
     // Update is called once per frame
     void Update()
     {
-        gameObject.transform.position += -Vector3.forward * moveSpeed * Time.deltaTime;
+        gameObject.transform.position += bulletDirection * moveSpeed * Time.deltaTime;
 
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null)
@@ -55,7 +66,30 @@ public class enemyBullet : MonoBehaviour
             textDisplay _textDisplay = other.GetComponent<textDisplay>();
             twice = _textDisplay.GetTwice();
 
-            createTwice();
+            objectName = other.gameObject.name;
+
+            if (!objectsToAvoid.Contains(objectName))
+            {
+                createTwice();
+                objectsToAvoid.Add(objectName);
+            }
+        }
+
+        if (other.CompareTag("Line"))
+        {
+            isLoose = true;
+            collidableObject.CancelInvoke();
+            scPlayer.isPlayerDeath = true;
+            cameraMove cameraShake = Camera.main.GetComponent<cameraMove>();
+            cameraShake.StartShake();
+            colorChange();
+            Invoke("bulletAllDestory", 0);
+            GameObject fadePanel = GameObject.Find("Canvas1");
+            Transform panelChild = fadePanel.transform.Find("Panel");
+            panelChild.gameObject.SetActive(true);
+            GameObject playerPanel = GameObject.Find("Player");
+            Transform playerChild = playerPanel.transform.Find("Canvas");
+            playerChild.gameObject.SetActive(false);
         }
     }
 
@@ -71,6 +105,41 @@ public class enemyBullet : MonoBehaviour
     {
         if (gameObject != null)
         {
+            if (collidableObject != null)
+            {
+                collidableObject.OnDestroy -= HandleObjectDestroyed;
+            }
+
+            StartCoroutine(WaitForFrames());
+        }
+    }
+
+    private enemyHealth FindNewCollidableObject()
+    {
+        GameObject[] objectsWithTag = GameObject.FindGameObjectsWithTag("EnemyBase");
+        foreach (var obj in objectsWithTag)
+        {
+            enemyHealth healthComponent = obj.GetComponent<enemyHealth>();
+            if (healthComponent != null && obj.activeSelf)
+            {
+                return healthComponent;
+            }
+        }
+
+        return null;
+    }
+
+    private IEnumerator WaitForFrames()
+    {
+        yield return null;
+
+        collidableObject = FindNewCollidableObject();
+        if (collidableObject != null)
+        {
+            collidableObject.OnDestroy += HandleObjectDestroyed;
+        }
+        else
+        {
             Invoke("bulletAllDestory", 0);
         }
     }
@@ -84,20 +153,29 @@ public class enemyBullet : MonoBehaviour
                 Vector3 spawnPosition;
                 int j = i % 2;
                 if (j == 0)
-                    spawnPosition = new Vector3(i * 0.3f, 0, 0);
+                    spawnPosition = new Vector3(i * 0.1f, 0, 0);
                 else
-                    spawnPosition = new Vector3(i * -0.3f, 0, 0);
+                    spawnPosition = new Vector3(i * -0.1f, 0, 0);
 
-                GameObject enemyBulletObj = Instantiate(gameObject, gameObject.transform.position + spawnPosition, Quaternion.identity);
-                enemyBulletObj.transform.Rotate(Vector3.up, 90f);
+                if (gameObject.CompareTag("SpecialBullet"))
+                {
+                    if (j == 0)
+                        spawnPosition = transform.right * i * 0.2f;
+                    else
+                        spawnPosition = transform.right * i * -0.2f;
+                }
+                enemyBullet p = null;
+                p = Instantiate(scEnemy, gameObject.transform.position + spawnPosition, Quaternion.identity);
+                p.objectsToAvoid.Add(objectName);
+
+                StartCoroutine(waitSpawn());
             }
         }
     }
 
     private void colorChange()
     {
-        if (collidableObject != null)
-        {
+
             collidableObject.OnDestroy -= HandleObjectDestroyed;
 
             initialPosition = gameObject.transform.position;
@@ -107,14 +185,19 @@ public class enemyBullet : MonoBehaviour
             renderer.material.color = fadedColor;
 
             StartCoroutine(ResetColorAfterDelay());
-        }
+        
     }
 
     private IEnumerator ResetColorAfterDelay()
     {
-        yield return new WaitForSeconds(0.2f); // 0.5ïbë“Ç¬
+        yield return new WaitForSeconds(0.0f); // 0.5ïbë“Ç¬
         renderer.material.color = initialColor; // å≥ÇÃêFÇ…ñﬂÇ∑
         Destroy(gameObject, 0.2f);
+    }
+
+    private IEnumerator waitSpawn()
+    {
+        yield return new WaitForSeconds(0.1f);
     }
 
     private void bulletAllDestory()
@@ -144,5 +227,10 @@ public class enemyBullet : MonoBehaviour
     {
         yield return new WaitForSeconds(delay);
         isEnabled = true; // ä÷êîÇçƒìxóLå¯Ç…Ç∑ÇÈ
+    }
+
+    private bool GetLoose()
+    {
+        return isLoose;
     }
 }
